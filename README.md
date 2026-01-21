@@ -62,6 +62,15 @@ Run the startup script to launch both backend and frontend:
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000
 
+## Docker Deployment (Recommended for Cloud)
+To run Vortex in a container (works on Railway, Render, VPS):
+
+```bash
+docker-compose up --build
+```
+Access the API at `http://localhost:8000`. 
+*Note: In Docker mode, you currently just serve the API. For the full UI, you need to serve the `web/frontend/dist` folder.*
+
 ## CLI Usage
 Run the script with the following command:
 
