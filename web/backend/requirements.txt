@@ -2,3 +2,7 @@ fastapi>=0.104.0
 uvicorn>=0.23.2
 python-multipart>=0.0.6
 pydantic>=2.4.2
+pyshark>=0.6.0
+scapy>=2.5.0
+cryptography>=41.0.0
+
