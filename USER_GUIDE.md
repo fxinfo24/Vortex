@@ -242,7 +242,7 @@ Vortex implements the professional workflow of using Nmap for discovery and Wire
    - In the scan results, locate the **"Analyze in Wireshark"** button.
    - Clicking this automatically:
      - Generates a precise Wireshark display filter based on discovered ports (e.g., `tcp.port == 80 or tcp.port == 443`).
-     - Swithes the interface to **Wireshark Suite**.
+     - Switches the interface to **Wireshark Suite**.
      - Pre-fills the "Display Filter" input.
 
 3. **Phase 3: Targeted Analysis (Wireshark)**
