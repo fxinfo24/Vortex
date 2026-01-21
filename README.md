@@ -1,6 +1,13 @@
-# NmapScanner
+# Vortex
 
-# Nmap Automation Script
+# Nmap Automation Script (Vortex)
+
+```text
+__      __        _
+\ \    / /__ _ __| |_ _____  __
+ \ \  / / _ \ '_ \  _/ -_) \/ /
+  \_\/_/\___/_| \_\__\___|\_,_/
+```
 
 ## Overview
 This script is designed to automate Nmap scans with a variety of customizable options to suit different use cases. It simplifies the process of running Nmap commands by providing a user-friendly interface and predefined arguments for common scanning scenarios.
@@ -40,7 +47,22 @@ bash
 brew install nmap
 ```
 On Windows, download and install Nmap from nmap.org.
-Usage
+## Web Interface
+This project includes a modern web interface (**Vortex UI**) for easier scanning.
+
+### Prerequisites
+- Node.js & npm
+- Python 3.13+
+
+### Usage
+Run the startup script to launch both backend and frontend:
+```bash
+./start_web.sh
+```
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+
+## CLI Usage
 Run the script with the following command:
 
 ```bash
