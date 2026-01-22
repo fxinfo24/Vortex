@@ -28,76 +28,49 @@ This script is designed to automate Nmap scans with a variety of customizable op
 ## Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/fxinfo24/NmapScanner.git
-   cd NmapScanner
+   git clone https://github.com/fxinfo24/Vortex.git
+   cd Vortex
    ```
-Install dependencies:
-```bash
+2. Install dependencies:
+   ```bash
+   pip install -r nmap-requirements.txt
+   ```
+3. Ensure Nmap is installed on your system.
+   - Debian/Ubuntu: `sudo apt-get install nmap`
+   - macOS: `brew install nmap`
+   - Windows: Download from nmap.org
 
-pip install -r nmap-requirements.txt
-```
-Ensure Nmap is installed on your system. You can install it using your package manager:
-On Debian/Ubuntu:
-```bash
-
-
-sudo apt-get install nmap
-On macOS:
-bash
-brew install nmap
-```
-On Windows, download and install Nmap from nmap.org.
-## Web Interface
-This project includes a modern web interface (**Vortex UI**) for easier scanning.
-
-### Prerequisites
-- Node.js & npm
-- Python 3.13+
-
-### Usage
-Run the startup script to launch both backend and frontend:
-```bash
-./start_web.sh
-```
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-
-## Docker Deployment (Recommended for Cloud)
-To run Vortex in a container (works on Railway, Render, VPS):
+## Docker Deployment (Preferred)
+The easiest way to run the full Vortex platform (Web UI + Backend) is via Docker:
 
 ```bash
-docker-compose up --build
+docker-compose up -d --build
 ```
-Access the API at `http://localhost:8000`. 
-*Note: In Docker mode, you currently just serve the API. For the full UI, you need to serve the `web/frontend/dist` folder.*
+- **Frontend/App**: http://localhost:8000 (UI is served by Backend)
+- **API**: http://localhost:8000/docs
 
-## CLI Usage
-Run the script with the following command:
+## CLI Usage (Legacy Script)
+You can still run the standalone Nmap automation script from the command line.
 
 ```bash
-
-
-python NmapScanner.py [options]
+python3 execution/NmapScanner.py [options]
 ```
 
-Example Commands
-Comprehensive scan:
+### Example Commands
+**Comprehensive scan:**
 ```bash
-
-python NmapScanner.py -t 192.168.1.1 -p 1-65535 -s comprehensive
+python3 execution/NmapScanner.py -t 192.168.1.1 -p 1-65535 -s comprehensive
 ```
 
-Stealth scan:
+**Stealth scan:**
 ```bash
-
-python NmapScanner.py -t 192.168.1.1 -p 80,443 -s stealth
+python3 execution/NmapScanner.py -t 192.168.1.1 -p 80,443 -s syn
 ```
 
-Aggressive scan with vulnerability detection:
-bash
-
-
-python NmapScanner.py -t 192.168.1.1 -p 1-1000 -s aggressive --vulners
+**Vulnerability scan:**
+```bash
+python3 execution/NmapScanner.py -t 192.168.1.1 -p 1-1000 -s vulnerability
+```
 License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
@@ -135,7 +108,43 @@ Stealth Scan (-s stealth): Uses the -sS argument in Nmap. Avoids completing the 
 
 ```bash
 
-python NmapScanner.py -t 192.168.1.1 -p 80,443 -s stealth
+[
+  {
+    "TargetContent": "python NmapScanner.py -t 192.168.1.1 -p 80,443 -s stealth",
+    "ReplacementContent": "python3 execution/NmapScanner.py -t 192.168.1.1 -p 80,443 -s syn",
+    "AllowMultiple": true,
+    "StartLine": 138,
+    "EndLine": 138
+  },
+  {
+    "TargetContent": "python NmapScanner.py -t 192.168.1.1 -p 53,161 -s udp",
+    "ReplacementContent": "python3 execution/NmapScanner.py -t 192.168.1.1 -p 53,161 -s udp",
+    "AllowMultiple": true,
+    "StartLine": 145,
+    "EndLine": 145
+  },
+  {
+    "TargetContent": "python NmapScanner.py -t 192.168.1.1 -p  1-1000 -s aggressive",
+    "ReplacementContent": "python3 execution/NmapScanner.py -t 192.168.1.1 -p 1-1000 -s comprehensive",
+    "AllowMultiple": true,
+    "StartLine": 152,
+    "EndLine": 152
+  },
+  {
+    "TargetContent": "python NmapScanner.py -t 192.168.1.1 -p 1-65535 -s comprehensive",
+    "ReplacementContent": "python3 execution/NmapScanner.py -t 192.168.1.1 -p 1-65535 -s comprehensive",
+    "AllowMultiple": true,
+    "StartLine": 160,
+    "EndLine": 160
+  },
+  {
+    "TargetContent": "python NmapScanner.py -t 192.168.1.1 -p 1-1000 -s aggressive --output xml",
+    "ReplacementContent": "python3 execution/NmapScanner.py -t 192.168.1.1 -p 1-1000 -s comprehensive -o scan_results -f json",
+    "AllowMultiple": true,
+    "StartLine": 171,
+    "EndLine": 171
+  }
+]
 ```
 
 UDP Scan (-s udp): Uses the -sU argument in Nmap. Scans for services running on UDP ports.
@@ -216,19 +225,43 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **1. Basic Scans**
 1. **Quick SYN Scan**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn
    ```
    - Performs a stealthy SYN scan on the first 1024 ports for quick reconnaissance.
 
 2. **Full Port Scan**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 1-65535 -s syn
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-65535 -s syn
    ```
    - Scans all 65,535 ports using a SYN scan for a complete overview of open ports.
 
 3. **UDP Scan**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 53,161 -s udp
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 53,161 -s udp
    ```
    - Scans UDP ports 53 (DNS) and 161 (SNMP) to identify UDP services.
 
@@ -237,13 +270,29 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **2. Comprehensive Scans**
 4. **Comprehensive Scan on All Ports**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 1-65535 -s comprehensive
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-65535 -s comprehensive
    ```
    - Combines SYN scan, service/version detection, OS detection, and script scanning for a detailed analysis.
 
 5. **Comprehensive Scan on Specific Ports**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 80,443 -s comprehensive
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 80,443 -s comprehensive
    ```
    - Focuses on web service ports (HTTP and HTTPS) for a detailed analysis.
 
@@ -252,13 +301,29 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **3. Vulnerability Scans**
 6. **Vulnerability Scan on Common Ports**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s vulnerability
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s vulnerability
    ```
    - Uses the `vulners` script to detect known vulnerabilities on the first 1024 ports.
 
 7. **Vulnerability Scan on All Ports**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 1-65535 -s vulnerability
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-65535 -s vulnerability
    ```
    - Scans all ports for vulnerabilities using the `vulners` script.
 
@@ -267,19 +332,43 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **4. Targeted Scans**
 8. **Web Server Scan**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 80,443 -s syn
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 80,443 -s syn
    ```
    - Focuses on HTTP and HTTPS ports to identify web services.
 
 9. **Database Server Scan**:
    ```bash
-   python NmapScanner.py -t 192.168.1.1 -p 3306,5432 -s syn
+   [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 3306,5432 -s syn
    ```
    - Scans MySQL (3306) and PostgreSQL (5432) ports to identify database services.
 
 10. **Email Server Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 25,110,143 -s syn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 25,110,143 -s syn
     ```
     - Scans SMTP (25), POP3 (110), and IMAP (143) ports to identify email services.
 
@@ -288,13 +377,29 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **5. Performance-Optimized Scans**
 11. **Fast Scan on Top 100 Ports**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-100 -s syn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-100 -s syn
     ```
     - Scans the top 100 ports for a quick overview of open services.
 
 12. **Aggressive Timing Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -T4
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -T4
     ```
     - Uses the `-T4` timing template for faster scanning on the first 1024 ports.
 
@@ -303,19 +408,43 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **6. Firewall/IDS Evasion Scans**
 13. **Fragmented Packet Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn --mtu 16
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn --mtu 16
     ```
     - Uses fragmented packets to evade firewalls and IDS.
 
 14. **Decoy Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -D RND:10
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -D RND:10
     ```
     - Uses 10 random decoys to mask the source of the scan.
 
 15. **Idle Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -sI 192.168.1.2
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -sI 192.168.1.2
     ```
     - Uses a zombie host (192.168.1.2) to perform an idle scan.
 
@@ -324,13 +453,29 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **7. Output Management**
 16. **Save Results in All Formats**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -oA scan_results
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -oA scan_results
     ```
     - Saves scan results in normal, XML, and grepable formats.
 
 17. **Save Results in XML Format**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -oX scan_results.xml
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -oX scan_results.xml
     ```
     - Saves scan results in XML format for programmatic analysis.
 
@@ -339,19 +484,43 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **8. Advanced Scans**
 18. **Custom NSE Script Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 80 -s syn --script http-waf-detect
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 80 -s syn --script http-waf-detect
     ```
     - Uses the `http-waf-detect` script to identify web application firewalls.
 
 19. **Service Version Detection**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -sV
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -sV
     ```
     - Detects the versions of services running on open ports.
 
 20. **OS Detection**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -O
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -O
     ```
     - Identifies the operating system of the target.
 
@@ -360,13 +529,29 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **9. Network Discovery**
 21. **Ping Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -sn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -sn
     ```
     - Performs a ping scan to identify live hosts without scanning ports.
 
 22. **Subnet Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.0/24 -p 1-1024 -s syn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.0/24 -p 1-1024 -s syn
     ```
     - Scans all hosts in the subnet 192.168.1.0/24.
 
@@ -375,19 +560,43 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **10. Specialized Scans**
 23. **IoT Device Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 80,443,8080 -s syn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 80,443,8080 -s syn
     ```
     - Focuses on ports commonly used by IoT devices.
 
 24. **VoIP Server Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 5060,5061 -s syn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 5060,5061 -s syn
     ```
     - Scans SIP ports (5060 and 5061) to identify VoIP servers.
 
 25. **Custom Port Range Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1000-2000 -s syn
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1000-2000 -s syn
     ```
     - Scans a custom range of ports (1000-2000).
 
@@ -396,13 +605,29 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **11. Timing and Rate Control**
 26. **Slow Stealthy Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn -T0
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn -T0
     ```
     - Uses the `-T0` timing template for a slow and stealthy scan.
 
 27. **Rate-Limited Scan**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn --min-rate 10
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn --min-rate 10
     ```
     - Limits the scan to a minimum rate of 10 packets per second.
 
@@ -411,7 +636,15 @@ For further assistance, please contact [fxinfo24@gmail.com].
 ### **12. Miscellaneous**
 28. **Scan with Custom Source Port**:
     ```bash
-    python NmapScanner.py -t 192.168.1.1 -p 1-1024 -s syn --source-port 53
+    [
+  {
+    "TargetContent": "python NmapScanner.py",
+    "ReplacementContent": "python3 execution/NmapScanner.py",
+    "AllowMultiple": true,
+    "StartLine": 218,
+    "EndLine": 428
+  }
+] -t 192.168.1.1 -p 1-1024 -s syn --source-port 53
     ```
     - Uses port 53 as the source port to bypass firewalls.
 

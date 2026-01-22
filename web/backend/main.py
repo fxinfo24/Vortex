@@ -1,23 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import sys
 import os
 import logging
+import asyncio
+import threading
+import nmap
 from typing import Optional, Dict, Any, List
 
 # Add execution directory to path to import NmapScanner modules
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../execution'))
-
-try:
-    from NmapScanner import perform_scan, validate_ip, validate_port_range, validate_target
-except ImportError as e:
-    logging.error(f"Failed to import NmapScanner: {e}")
-    # Create mock functions if import fails (dev mode fallback or error)
-    def perform_scan(*args, **kwargs): raise NotImplementedError("Scanner module not found")
-    def validate_ip(*args, **kwargs): pass
-    def validate_port_range(*args, **kwargs): pass
-    def validate_target(*args, **kwargs): pass
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../execution"))
 
 app = FastAPI(title="Vortex API")
 
@@ -30,12 +25,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-
 # Mount static files (Frontend build)
-# Check if dist exists (production/docker mode)
-frontend_dist = os.path.join(os.path.dirname(__file__), '../frontend/dist')
+frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
 if os.path.exists(frontend_dist):
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
     
@@ -51,6 +42,47 @@ if os.path.exists(frontend_dist):
     async def serve_favicon():
         return FileResponse(os.path.join(frontend_dist, "favicon.png"))
 
+# --- Scan Manager for Cancellable Scans ---
+
+class ScanManager:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.active_events = []
+    
+    def register_event(self, event: threading.Event):
+        with self._lock:
+            self.active_events.append(event)
+            
+    def unregister_event(self, event: threading.Event):
+        with self._lock:
+            if event in self.active_events:
+                self.active_events.remove(event)
+
+    def stop_current_scan(self):
+        """ Aggressively kill nmap processes to stop the scan and signal threads. """
+        import subprocess
+        
+        # Stop Python Tasks
+        with self._lock:
+            count = len(self.active_events)
+            for event in self.active_events:
+                event.set()
+            # We don't clear list immediately as threads remove themselves, 
+            # but for safety we can clear to avoid holding stale refs if threads die weirdly?
+            # Actually threads call unregister in finally block, so let's just set events.
+        
+        try:
+             # This is a rough way to stop, but `python-nmap` leaves us little choice 
+             # without rewriting `NmapScanner.py` to use `subprocess.Popen` directly.
+             # We kill "nmap" processes.
+             subprocess.run(["pkill", "nmap"], check=False)
+             return True
+        except Exception as e:
+             logging.error(f"Failed to kill nmap: {e}")
+             return False
+
+scan_manager = ScanManager()
+
 class ScanRequest(BaseModel):
     target: str
     ports: str
@@ -63,38 +95,38 @@ async def api_status():
 
 @app.post("/scan")
 async def run_scan(request: ScanRequest):
+    # Run in thread to allow non-blocking API so we can call /scan/stop
     try:
-        # Validate inputs using the script's validators
-        try:
-            # The script validators raise argument errors tailored for CLI (argparse)
-            # We might want to catch them or just let the scanner handle it
-            validate_target(request.target)
-            validate_port_range(request.ports)
-        except Exception as e:
-             raise HTTPException(status_code=400, detail=str(e))
-
-        # Perform Scan
-        # perform_scan(target, ports, scan_type, retries=3, timing=None)
-        # It is synchronous, so we might want to run it in a threadpool if it blocks too long,
-        # but NmapScanner already uses async internally for multiple targets.
-        # However, perform_scan itself is blocking wrapper around the async loop if multiple targets,
-        # or direct call if single.
-        # For a web request, we should probably run this in a thread to not block the event loop.
-        # But wait, NmapScanner imports asyncio. 
-        # Let's just call it directly for now. Ideally we refactor NmapScanner to be purely async.
+        from NmapScanner import perform_scan, validate_target, validate_port_range
         
-        results = perform_scan(
-            target=request.target,
-            ports=request.ports,
-            scan_type=request.scan_type,
+        # Pre-validation
+        validate_target(request.target)
+        validate_port_range(request.ports)
+        
+        # We use asyncio.to_thread to run the blocking scan function
+        # This frees the event loop to accept the /scan/stop request
+        results = await asyncio.to_thread(
+            perform_scan, 
+            request.target, 
+            request.ports, 
+            request.scan_type, 
+            retries=1, 
             timing=request.timing
         )
-        
         return results
-
+        
     except Exception as e:
         logging.error(f"Scan failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/scan/stop")
+async def stop_scan():
+    """Stop any currently running nmap scans."""
+    success = scan_manager.stop_current_scan()
+    if success:
+        return {"status": "success", "message": "Scan stopped (nmap processes killed)"}
+    else:
+         raise HTTPException(status_code=500, detail="Failed to stop scan")
 
 # --- Network Analyzer Integration ---
 try:
@@ -142,13 +174,19 @@ class DecryptRequest(BaseModel):
 async def network_scan(req: NetworkScanRequest):
     if not net_analyzer:
         raise HTTPException(status_code=503, detail="Network analyzer not initialized")
-    return net_analyzer.network_mapper(req.subnet)
+    return await asyncio.to_thread(net_analyzer.network_mapper, req.subnet)
 
 @app.post("/api/net/capture")
 async def packet_capture(req: CaptureRequest):
     if not net_analyzer:
          raise HTTPException(status_code=503, detail="Network analyzer not initialized")
-    return await net_analyzer.packet_capture(duration=req.duration, packet_count=req.count, display_filter=req.filter)
+    
+    stop_event = threading.Event()
+    scan_manager.register_event(stop_event)
+    try:
+        return await net_analyzer.packet_capture(duration=req.duration, packet_count=req.count, display_filter=req.filter, stop_event=stop_event)
+    finally:
+        scan_manager.unregister_event(stop_event)
 
 @app.post("/api/net/analyze")
 async def sensitive_analysis():
@@ -167,13 +205,25 @@ async def inject_packets(req: InjectRequest):
 async def mitm_attack(req: MitmRequest):
     if not net_analyzer:
          raise HTTPException(status_code=503, detail="Network analyzer not initialized")
-    return net_analyzer.mitm_attack(req.target, req.gateway, req.duration)
+    
+    stop_event = threading.Event()
+    scan_manager.register_event(stop_event)
+    try:
+        return await asyncio.to_thread(net_analyzer.mitm_attack, req.target, req.gateway, req.duration, stop_event)
+    finally:
+        scan_manager.unregister_event(stop_event)
 
 @app.post("/api/net/dos")
 async def dos_attack(req: DosRequest):
     if not net_analyzer:
          raise HTTPException(status_code=503, detail="Network analyzer not initialized")
-    return net_analyzer.dos_attack(req.target, req.port, req.duration)
+    
+    stop_event = threading.Event()
+    scan_manager.register_event(stop_event)
+    try:
+        return await asyncio.to_thread(net_analyzer.dos_attack, req.target, req.port, req.duration, stop_event)
+    finally:
+        scan_manager.unregister_event(stop_event)
 
 @app.post("/api/net/decrypt")
 async def decrypt_traffic(req: DecryptRequest):
@@ -198,11 +248,7 @@ async def generate_filter(results: Dict[str, Any]):
     for ip, data in results.items():
         if ip == "runtime": continue # skip metadata
         
-        # Add host filter? Usually mapped per port, but let's follow user script logic:
-        # User script: protocol.port == portid.
-        # It doesn't restrict by IP in the filter logic provided, but practically we should OR them.
-        
-        for proto in ['tcp', 'udp']:
+        for proto in ["tcp", "udp"]:
             if proto in data:
                 for port in data[proto]:
                     # Filters like: tcp.port == 80
@@ -212,4 +258,3 @@ async def generate_filter(results: Dict[str, Any]):
         return {"filter": ""}
         
     return {"filter": " or ".join(filters)}
-

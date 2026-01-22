@@ -1,22 +1,29 @@
-# Vortex: Advanced Network Reconnaissance Platform
+# Vortex: Nmap Automation & Network Security Platform
 
-Vortex is a powerful, integrated network security platform combining the discovery capabilities of **Nmap** with the deep analysis features of **Wireshark**. Designed for security professionals, it offers a unified interface for reconnaissance, traffic analysis, and authorized red team operations.
+```text
+__      __        _
+\ \    / /__ _ __| |_ _____  __
+ \ \  / / _ \ '_ \  _/ -_) \/ /
+  \_\/_/\___/_| \_\__\___|\_,_/
+```
 
-## 🚀 Features
+## Overview
+This script is designed to automate Nmap scans with a variety of customizable options to suit different use cases. It simplifies the process of running Nmap commands by providing a user-friendly interface and predefined arguments for common scanning scenarios.
 
-*   **Integrated Workflow**: Seamlessly transition from Nmap discovery to targeted Wireshark packet capture.
-*   **Nmap Scanner**:
-    *   Full suite of scan profiles (SYN, UDP, Vulnerability, Comprehensive).
-    *   Visual results with service detection.
-    *   CLI automation script support.
-*   **Wireshark Suite**:
-    *   **Packet Capture**: Live traffic sniffing with auto-generated filters.
-    *   **Secret Hunter**: Automated detection of credentials, cookies, and tokens.
-    *   **Network Map**: Real-time ARP discovery of local devices.
-*   **Red Team Operations** (Authorized Use Only):
-    *   **MITM**: ARP Spoofing for traffic interception.
-    *   **DoS**: Controlled stress testing.
-    *   **SSL Decryption**: Analyze encrypted traffic with key logs.
+## Features
+- Supports multiple scan types, including TCP, UDP, and aggressive scans.
+- Allows specification of custom port ranges and target IPs.
+- Includes advanced Nmap arguments for vulnerability detection, service version detection, and more.
+- Saves scan results in multiple formats (normal, XML, grepable).
+- Provides timing control for stealth or speed optimization.
+- Supports custom NSE scripts for specialized tasks.
+- **Integrated Wireshark Suite**: Seamlessly transition from Nmap discovery to targeted packet capture and analysis.
+
+## Requirements
+- Python 3.x
+- Nmap installed on the system
+- Required Python libraries (install via `pip install -r nmap-requirements.txt`)
+- **Docker** (Recommended for full platform deployment)
 
 ## 📚 Documentation
 

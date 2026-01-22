@@ -29,6 +29,17 @@ export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkP
         if (onLog) onLog(fullMsg);
     };
 
+    const handleStopScan = async () => {
+        try {
+            // Network mapper uses nmap, so /scan/stop (pkill nmap) works
+            await axios.post('/scan/stop');
+            addLog("Mapper stopped by user.");
+            setLoading(false);
+        } catch (e: any) {
+            addLog(`Failed to stop: ${e.message}`);
+        }
+    };
+
     const handleDecrypt = async () => {
         setLoading(true);
         addLog(`Decrypting ${pcapPath} with ${keyPath}...`);
@@ -189,9 +200,17 @@ export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkP
                                 />
                                 <p className="text-[10px] text-gray-500">Tip: Use /24 for faster scans.</p>
                             </div>
-                            <button onClick={handleNetworkScan} disabled={loading} className="btn-primary w-full">
-                                {loading ? 'Scanning...' : 'Start Mapper'}
-                            </button>
+                            <div className="flex gap-2">
+                                {!loading ? (
+                                    <button onClick={handleNetworkScan} disabled={loading} className="btn-primary w-full">
+                                        Start Mapper
+                                    </button>
+                                ) : (
+                                    <button onClick={handleStopScan} className="w-full p-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-600/20">
+                                        Stop Mapper
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     )}
 

@@ -31,6 +31,16 @@ function App() {
     }
   };
 
+  const handleStopScan = async () => {
+    try {
+      await axios.post('/scan/stop');
+      setLoading(false);
+      setError("Scan stopped by user.");
+    } catch (e) {
+      console.error("Failed to stop scan", e);
+    }
+  };
+
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -172,23 +182,26 @@ function App() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary w-full shadow-lg shadow-[#00f0ff]/20"
-                >
-                  {loading ? (
-                    <>
-                      <Activity className="w-5 h-5 animate-spin" />
-                      Scanning...
-                    </>
-                  ) : (
-                    <>
+                <div className="flex gap-2">
+                  {!loading ? (
+                    <button
+                      type="submit"
+                      className="btn-primary w-full shadow-lg shadow-[#00f0ff]/20"
+                    >
                       <Terminal className="w-5 h-5" />
                       Start Scan
-                    </>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStopScan}
+                      className="w-full p-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-600/20"
+                    >
+                      <Activity className="w-5 h-5 animate-spin" />
+                      Stop Scan
+                    </button>
                   )}
-                </button>
+                </div>
               </form>
             </motion.div>
 

