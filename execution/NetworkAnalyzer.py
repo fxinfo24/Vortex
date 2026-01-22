@@ -101,56 +101,120 @@ class AdvancedNetworkAnalyzer:
 
 
     def network_mapper(self, subnet: str) -> List[Dict[str, str]]:
-        """Map all devices in network using ARP."""
+        """Map all devices in network using Nmap (faster than Scapy)."""
         try:
-            # scapy srp requires root, which we should have in docker
-            arp = scapy.ARP(pdst=subnet)
-            ether = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
-            packet = ether / arp
+            # Use Nmap for fast ping/ARP scan (-sn)
+            # -sn: Ping Scan - disable port scan
+            # -oG -: Output in Grepable format to stdout
+            cmd = f"nmap -sn -oG - {subnet}"
+            process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             
-            # Reduce timeout for web responsiveness
-            result = scapy.srp(packet, timeout=2, verbose=False, iface=self.interface)[0]
-
             devices = []
-            for sent, received in result:
-                devices.append({'ip': received.psrc, 'mac': received.hwsrc})
+            if process.returncode == 0:
+                for line in process.stdout.splitlines():
+                    if "Host:" in line:
+                        # Parse Nmap grepable output
+                        # Host: 172.18.0.2 (foo.bar)	Status: Up	...
+                        parts = line.split()
+                        ip = parts[1]
+                        
+                        # Mac address might be in the output if root/local
+                        mac = "Unknown"
+                        # Try to find MAC in output if available (e.g. from ARP)
+                        # Nmap grepable format doesn't always show MAC easily, 
+                        # but standard output does. Let's try parsing standard output or just use scapy for specific targets?
+                        # Actually for speed, just IP is fine, but user likes MACs.
+                        # Let's try to extract MAC from the line if possible or leave unknown.
+                        # Grepable output sucks for MACs. Let's use -oX (XML) or just basic parsing.
+                        pass
+            
+            # Alternative: Use simple scapy for small subnets or nmap for speed.
+            # Given the user wants speed, Nmap is king.
+            # Let's retry with XML parsing if we really need structure, 
+            # OR just go back to Scapy but with a timeout per packet or constrained concurrency?
+            # Scapy srp is synchronous.
+            # Let's stick to the previous implementation but Optimize it:
+            # 1. Use Nmap to find active IPs (FAST)
+            # 2. Use Scapy to resolve MACs only for active IPs (FAST)
+            
+            # Step 1: Nmap Ping Scan
+            active_ips = []
+            cmd = f"nmap -sn -n {subnet} | grep 'Nmap scan report for'"
+            # Output: Nmap scan report for 172.18.0.2
+            proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            for line in proc.stdout.splitlines():
+                parts = line.split()
+                # Nmap scan report for 172.18.0.2 -> length 5
+                if len(parts) >= 5:
+                    active_ips.append(parts[4]) 
+            
+            if not active_ips:
+                return []
+
+            # Step 2: Resolve MACs (Optional/Fast since we have IPs)
+            devices = []
+            for ip in active_ips:
+                devices.append({'ip': ip, 'mac': self._resolve_mac(ip)})
+                
             return devices
+
         except Exception as e:
             print(f"Network mapper error: {e}")
             return []
 
-    async def packet_capture(self, duration: int = 5, packet_count: int = 10, display_filter: str = "") -> List[Dict[str, Any]]:
-        """Capture packets for a fixed duration and return simplified details."""
-        packets_data = []
-        
+    def _resolve_mac(self, ip: str) -> str:
         try:
-            # display_filter applies Wireshark display filters (e.g., 'tcp.port == 80')
+            # Scapy getmacbyip is fast for single IP
+            mac = scapy.getmacbyip(ip)
+            return mac if mac else "Unknown"
+        except:
+            return "Unknown"
+
+    async def packet_capture(self, duration: int = 5, packet_count: int = 50, display_filter: str = "") -> List[Dict[str, Any]]:
+        """Capture packets for a fixed duration and return simplified details."""
+        return await asyncio.to_thread(self._packet_capture_sync, duration, packet_count, display_filter)
+
+    def _packet_capture_sync(self, duration: int, packet_count: int, display_filter: str) -> List[Dict[str, Any]]:
+        packets_data = []
+        try:
+            # Use a new event loop for this thread if strictly needed by pyshark, 
+            # but usually running it in a thread isolates it enough if using sync methods.
+            # pyshark 'sniff_continuously' is a generator.
+            
+            # Note: We need to be careful with TShark paths if not in PATH, but we checked it is.
             capture = pyshark.LiveCapture(interface=self.interface, display_filter=display_filter)
             
-            # Use sniff_continuously to yield packets as they come
-            # We add a timeout mechanism
             start_time = time.time()
             
+            # Iterate synchronously
             for packet in capture.sniff_continuously(packet_count=packet_count):
                 if time.time() - start_time > duration:
                     break
                 
-                pkt_info = {
-                    "timestamp": getattr(packet, "sniff_time", str(time.time())),
-                    "protocol": packet.highest_layer,
-                    "length": packet.length,
-                    "source": packet.ip.src if hasattr(packet, 'ip') else "Unknown",
-                    "destination": packet.ip.dst if hasattr(packet, 'ip') else "Unknown",
-                    "info": str(packet) # Basic string representation
-                }
-                
-                # Extract some specific layer info if available
-                if hasattr(packet, 'http'):
-                    pkt_info['info'] = f"HTTP {packet.http.request_method if hasattr(packet.http, 'request_method') else ''} {packet.http.host if hasattr(packet.http, 'host') else ''}"
-                elif hasattr(packet, 'dns'):
-                    pkt_info['info'] = f"DNS {packet.dns.qry_name if hasattr(packet.dns, 'qry_name') else ''}"
+                try:
+                    sniff_time = getattr(packet, "sniff_time", time.time())
+                    if hasattr(sniff_time, 'timestamp'):
+                        timestamp = sniff_time.timestamp()
+                    else:
+                        timestamp = float(sniff_time)
 
-                packets_data.append(pkt_info)
+                    pkt_info = {
+                        "timestamp": str(timestamp), 
+                        "protocol": packet.highest_layer,
+                        "length": packet.length,
+                        "source": packet.ip.src if hasattr(packet, 'ip') else "Unknown",
+                        "destination": packet.ip.dst if hasattr(packet, 'ip') else "Unknown",
+                        "info": str(packet) 
+                    }
+                    
+                    if hasattr(packet, 'http'):
+                        pkt_info['info'] = f"HTTP {packet.http.request_method if hasattr(packet.http, 'request_method') else ''} {packet.http.host if hasattr(packet.http, 'host') else ''}"
+                    elif hasattr(packet, 'dns'):
+                        pkt_info['info'] = f"DNS {packet.dns.qry_name if hasattr(packet.dns, 'qry_name') else ''}"
+
+                    packets_data.append(pkt_info)
+                except Exception as loop_e:
+                    continue # Skip packet parsing errors
                 
             capture.close()
             return packets_data
@@ -159,8 +223,11 @@ class AdvancedNetworkAnalyzer:
             print(f"Capture error: {e}")
             return [{"error": str(e)}]
 
-    def extract_sensitive_data(self, duration: int = 10) -> Dict[str, List[str]]:
+    async def extract_sensitive_data(self, duration: int = 10) -> Dict[str, List[str]]:
         """Sniff and look for sensitive patterns (mock/demo version safe for web)."""
+        return await asyncio.to_thread(self._extract_sensitive_data_sync, duration)
+
+    def _extract_sensitive_data_sync(self, duration: int) -> Dict[str, List[str]]:
         sensitive_data = {
             'credentials': [],
             'cookies': [],
@@ -169,20 +236,22 @@ class AdvancedNetworkAnalyzer:
         
         try:
             capture = pyshark.LiveCapture(interface=self.interface)
-            # Run for a short burst
             capture.sniff(timeout=duration)
             
             for packet in capture:
-                if hasattr(packet, 'http'):
-                    if hasattr(packet.http, 'authorization'):
-                        sensitive_data['credentials'].append(packet.http.authorization)
-                    if hasattr(packet.http, 'cookie'):
-                        sensitive_data['cookies'].append(packet.http.cookie)
+                try:
+                    if hasattr(packet, 'http'):
+                        if hasattr(packet.http, 'authorization'):
+                            sensitive_data['credentials'].append(packet.http.authorization)
+                        if hasattr(packet.http, 'cookie'):
+                            sensitive_data['cookies'].append(packet.http.cookie)
 
-                if hasattr(packet, 'tcp'):
-                    payload = str(packet.tcp.payload) if hasattr(packet.tcp, 'payload') else ''
-                    if 'token' in payload.lower():
-                        sensitive_data['tokens'].append(payload[:50] + "...") # Truncate for display
+                    if hasattr(packet, 'tcp'):
+                        payload = str(packet.tcp.payload) if hasattr(packet.tcp, 'payload') else ''
+                        if 'token' in payload.lower():
+                            sensitive_data['tokens'].append(payload[:50] + "...") 
+                except:
+                    continue
 
             capture.close()
             return sensitive_data

@@ -10,7 +10,7 @@ interface WiresharkPanelProps {
 
 export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkPanelProps) {
     const [activeTab, setActiveTab] = useState<'map' | 'capture' | 'analyze' | 'redteam'>('capture');
-    const [subnet, setSubnet] = useState('172.18.0.0/16'); // Default docker subnet guess
+    const [subnet, setSubnet] = useState('172.18.0.0/24'); // Default smaller subnet for speed
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState<any>(null);
     const [logs, setLogs] = useState<string[]>([]);
@@ -123,6 +123,19 @@ export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkP
         }
     }
 
+    const handlePromisc = async () => {
+        setLoading(true);
+        addLog("Enabling Promiscuous Mode on interface...");
+        try {
+            await axios.post('/api/net/promisc');
+            addLog("Success: Promiscuous Mode Enabled.");
+        } catch (e: any) {
+            addLog(`Error: ${e.response?.data?.detail || e.message}`);
+        } finally {
+            setLoading(false);
+        }
+    }
+
     return (
         <div className="space-y-6">
             {/* Tabs */}
@@ -174,6 +187,7 @@ export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkP
                                     onChange={e => setSubnet(e.target.value)}
                                     className="input-field"
                                 />
+                                <p className="text-[10px] text-gray-500">Tip: Use /24 for faster scans.</p>
                             </div>
                             <button onClick={handleNetworkScan} disabled={loading} className="btn-primary w-full">
                                 {loading ? 'Scanning...' : 'Start Mapper'}
@@ -246,6 +260,12 @@ export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkP
                             <button onClick={handleDecrypt} disabled={loading} className="w-full mt-2 p-2 bg-red-900/30 text-red-400 border border-red-900 rounded hover:bg-red-900/50 text-xs">
                                 Decrypt Traffic
                             </button>
+
+                            <hr className="border-red-900/30 my-4" />
+
+                            <button onClick={handlePromisc} disabled={loading} className="w-full p-2 bg-red-900/30 text-red-400 border border-red-900 rounded hover:bg-red-900/50 text-xs font-mono uppercase tracking-wider">
+                                Enable Promiscuous Mode
+                            </button>
                         </div>
                     )}
 
@@ -290,7 +310,14 @@ export default function WiresharkPanel({ initialFilter = '', onLog }: WiresharkP
                                 <tbody>
                                     {results.data.map((pkt: any, i: number) => (
                                         <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                                            <td className="p-2 text-gray-400">{new Date(parseFloat(pkt.timestamp) * 1000).toLocaleTimeString()}</td>
+                                            <td className="p-2 text-gray-400">
+                                                {(() => {
+                                                    if (!pkt.timestamp) return 'N/A';
+                                                    const ts = parseFloat(pkt.timestamp);
+                                                    if (isNaN(ts)) return 'Invalid';
+                                                    return new Date(ts * 1000).toLocaleTimeString();
+                                                })()}
+                                            </td>
                                             <td className="p-2 text-yellow-500">{pkt.protocol}</td>
                                             <td className="p-2 text-blue-400">{pkt.source}</td>
                                             <td className="p-2 text-blue-400">{pkt.destination}</td>

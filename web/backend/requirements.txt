@@ -6,3 +6,5 @@ pyshark>=0.6.0
 scapy>=2.5.0
 cryptography>=41.0.0
 
+python-nmap>=0.7.1
+tqdm

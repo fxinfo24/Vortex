@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import sys
 import os
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, List
 
 # Add execution directory to path to import NmapScanner modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../execution'))
@@ -15,6 +15,9 @@ except ImportError as e:
     logging.error(f"Failed to import NmapScanner: {e}")
     # Create mock functions if import fails (dev mode fallback or error)
     def perform_scan(*args, **kwargs): raise NotImplementedError("Scanner module not found")
+    def validate_ip(*args, **kwargs): pass
+    def validate_port_range(*args, **kwargs): pass
+    def validate_target(*args, **kwargs): pass
 
 app = FastAPI(title="Vortex API")
 
@@ -177,6 +180,16 @@ async def decrypt_traffic(req: DecryptRequest):
     if not net_analyzer:
          raise HTTPException(status_code=503, detail="Network analyzer not initialized")
     return net_analyzer.decrypt_ssl_traffic(req.pcap_path, req.key_path)
+
+@app.post("/api/net/promisc")
+async def enable_promisc():
+    if not net_analyzer:
+         raise HTTPException(status_code=503, detail="Network analyzer not initialized")
+    success = net_analyzer.enable_promiscuous_mode()
+    if success:
+        return {"status": "success", "message": "Promiscuous mode enabled on interface"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to enable promiscuous mode")
 
 @app.post("/api/utils/nmap-to-filter")
 async def generate_filter(results: Dict[str, Any]):
